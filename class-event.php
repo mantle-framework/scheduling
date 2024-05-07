@@ -22,66 +22,81 @@ use Mantle\Support\Traits\Macroable;
 use Throwable;
 
 /**
- * Schedule-able Event
+ * Schedulable Event
  */
 class Event {
 	use Macroable, Manages_Frequencies;
 
 	/**
 	 * The cron expression representing the event's frequency.
+	 *
+	 * @var string
 	 */
-	public string $expression = '* * * * *';
+	public $expression = '* * * * *';
 
 	/**
 	 * The list of environments the command should run under.
 	 *
-	 * @var string[]
+	 * @var array
 	 */
-	public array $environments = [];
+	public $environments = [];
+
+	/**
+	 * Indicates if the command should not overlap itself.
+	 *
+	 * @var bool
+	 */
+	public $without_overlapping = false;
 
 	/**
 	 * The array of filter callbacks.
 	 *
-	 * @var callable[]
+	 * @var array
 	 */
-	protected array $filters = [];
+	protected $filters = [];
 
 	/**
 	 * The array of reject callbacks.
 	 *
-	 * @var callable[]
+	 * @var array
 	 */
-	protected array $rejects = [];
+	protected $rejects = [];
 
 	/**
 	 * The array of callbacks to be run before the event is started.
 	 *
-	 * @var callable[]
+	 * @var array
 	 */
-	protected array $before_callbacks = [];
+	protected $before_callbacks = [];
 
 	/**
 	 * The array of callbacks to be run after the event is finished.
 	 *
-	 * @var callable[]
+	 * @var array
 	 */
-	protected array $after_callbacks = [];
+	protected $after_callbacks = [];
 
 	/**
 	 * The human readable description of the event.
+	 *
+	 * @var string
 	 */
-	public string $description;
+	public $description;
 
 	/**
 	 * The exit status code of the command.
 	 * 0 for success and 1 for failure.
+	 *
+	 * @var int|null
 	 */
-	public ?int $exit_code = null;
+	public $exit_code;
 
 	/**
 	 * Exception thrown for the command.
+	 *
+	 * @var \Throwable
 	 */
-	public \Throwable $exception;
+	public $exception;
 
 	/**
 	 * Create a new event instance.
@@ -102,7 +117,7 @@ class Event {
 	 *
 	 * @param Application $container
 	 */
-	public function run( Application $container ): void {
+	public function run( Application $container ) {
 		if ( ! $this->filters_pass( $container ) ) {
 			return;
 		}
@@ -131,10 +146,11 @@ class Event {
 	 * Call all of the "before" callbacks for the event.
 	 *
 	 * @param  \Mantle\Contracts\Container $container
+	 * @return void
 	 */
-	public function call_before_callbacks( Container $container ): void {
-		foreach ( $this->before_callbacks as $before_callback ) {
-			$container->call( $before_callback );
+	public function call_before_callbacks( Container $container ) {
+		foreach ( $this->before_callbacks as $callback ) {
+			$container->call( $callback );
 		}
 	}
 
@@ -142,10 +158,11 @@ class Event {
 	 * Call all of the "after" callbacks for the event.
 	 *
 	 * @param  \Mantle\Contracts\Container $container
+	 * @return void
 	 */
-	public function call_after_callbacks( Container $container ): void {
-		foreach ( $this->after_callbacks as $after_callback ) {
-			$container->call( $after_callback );
+	public function call_after_callbacks( Container $container ) {
+		foreach ( $this->after_callbacks as $callback ) {
+			$container->call( $callback );
 		}
 	}
 
@@ -153,14 +170,17 @@ class Event {
 	 * Determine if the given event should run based on the Cron expression.
 	 *
 	 * @param Application $app
+	 * @return bool
 	 */
-	public function is_due( Application $app ): bool {
+	public function is_due( Application $app ) {
 		return $this->expression_passes() &&
 			$this->runs_in_environment( $app->environment() );
 	}
 
 	/**
 	 * Determine if the Cron expression passes.
+	 *
+	 * @return bool
 	 */
 	protected function expression_passes(): bool {
 		$date = Carbon::now();
@@ -177,6 +197,7 @@ class Event {
 	 * Determine if the event runs in the given environment.
 	 *
 	 * @param string $environment Environment to check against.
+	 * @return bool
 	 */
 	public function runs_in_environment( $environment ): bool {
 		return empty( $this->environments ) || in_array( $environment, $this->environments );
@@ -186,16 +207,17 @@ class Event {
 	 * Determine if the filters pass for the event.
 	 *
 	 * @param Application $app Application instance.
+	 * @return bool
 	 */
 	public function filters_pass( Application $app ): bool {
-		foreach ( $this->filters as $filter ) {
-			if ( ! $app->call( $filter ) ) {
+		foreach ( $this->filters as $callback ) {
+			if ( ! $app->call( $callback ) ) {
 				return false;
 			}
 		}
 
-		foreach ( $this->rejects as $reject ) {
-			if ( $app->call( $reject ) ) {
+		foreach ( $this->rejects as $callback ) {
+			if ( $app->call( $callback ) ) {
 				return false;
 			}
 		}
@@ -272,7 +294,7 @@ class Event {
 	 * @return \Closure
 	 */
 	protected function pingCallback( $url ) {
-		return function ( Container $container, Factory $http ) use ( $url ): void {
+		return function ( Container $container, Factory $http ) use ( $url ) {
 			try {
 				$http->throw_exception()->get( $url );
 			} catch ( Http_Client_Exception $e ) {
@@ -299,7 +321,9 @@ class Event {
 	 * @return static
 	 */
 	public function when( $callback ) {
-		$this->filters[] = is_callable( $callback ) ? $callback : fn () => $callback;
+		$this->filters[] = is_callable( $callback ) ? $callback : function () use ( $callback ) {
+			return $callback;
+		};
 
 		return $this;
 	}
@@ -311,7 +335,9 @@ class Event {
 	 * @return static
 	 */
 	public function skip( $callback ) {
-		$this->rejects[] = is_callable( $callback ) ? $callback : fn () => $callback;
+		$this->rejects[] = is_callable( $callback ) ? $callback : function () use ( $callback ) {
+			return $callback;
+		};
 
 		return $this;
 	}
@@ -358,7 +384,7 @@ class Event {
 	 */
 	public function onSuccess( Closure $callback ) {
 		return $this->then(
-			function ( Container $container ) use ( $callback ): void {
+			function ( Container $container ) use ( $callback ) {
 				if ( 0 === $this->exit_code ) {
 					$container->call( $callback, [ $this ] );
 				}
@@ -374,7 +400,7 @@ class Event {
 	 */
 	public function onFailure( Closure $callback ) {
 		return $this->then(
-			function ( Container $container ) use ( $callback ): void {
+			function ( Container $container ) use ( $callback ) {
 				if ( 0 !== $this->exit_code ) {
 					$container->call( $callback, [ $this ] );
 				}

@@ -44,7 +44,7 @@ class Command_Event extends Event {
 	 *
 	 * @param Application $container Container instance.
 	 */
-	public function run( Application $container ): void {
+	public function run( Application $container ) {
 		if ( ! $this->filters_pass( $container ) ) {
 			return;
 		}
