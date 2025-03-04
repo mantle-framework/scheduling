@@ -44,7 +44,7 @@ class Command_Event extends Event {
 	 *
 	 * @param Application $container Container instance.
 	 */
-	public function run( Application $container ): void {
+	public function run( Application $container ) {
 		if ( ! $this->filters_pass( $container ) ) {
 			return;
 		}
@@ -54,7 +54,8 @@ class Command_Event extends Event {
 		$instance = $container->make( $this->callback );
 
 		try {
-			$instance->handle( $this->parameters, $this->assoc_args );
+			// todo: revisit this and test the command to run.
+			$instance->callback( $this->parameters, $this->assoc_args );
 
 			$this->exit_code = 0;
 		} catch ( Throwable $e ) {
