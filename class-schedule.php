@@ -39,8 +39,6 @@ class Schedule {
 
 	/**
 	 * Timezone for scheduling.
-	 *
-	 * @var DateTimeZone|null
 	 */
 	protected ?DateTimeZone $timezone = null;
 
@@ -57,7 +55,7 @@ class Schedule {
 	 * @param Application  $container Application container instance.
 	 * @param DateTimeZone $timezone Timezone instance, optional.
 	 */
-	public function __construct( Application $container, DateTimeZone $timezone = null ) {
+	public function __construct( Application $container, ?DateTimeZone $timezone = null ) {
 		$this->container = $container;
 
 		if ( $timezone ) {
@@ -67,8 +65,6 @@ class Schedule {
 
 	/**
 	 * Get the timezone instance for scheduling.
-	 *
-	 * @return DateTimeZone
 	 */
 	protected function get_timezone(): DateTimeZone {
 		return $this->timezone ?? \wp_timezone();
@@ -77,7 +73,7 @@ class Schedule {
 	/**
 	 * Schedule the WordPress cron event for the scheduler.
 	 */
-	public static function schedule_cron_event() {
+	public static function schedule_cron_event(): void {
 		if ( ! is_blog_installed() ) {
 			return;
 		}
@@ -95,7 +91,7 @@ class Schedule {
 	/**
 	 * Run the scheduled events that are due to run.
 	 */
-	public function run_due_events() {
+	public function run_due_events(): void {
 		$this
 			->due_events( $this->container )
 			->each( fn ( Event $event ) => $event->run( $this->container ) );
@@ -104,10 +100,9 @@ class Schedule {
 	/**
 	 * Add a new command event.
 	 *
-	 * @param string $command Command class to run.
-	 * @param array  $arguments Arguments for the command.
-	 * @param array  $assoc_args Assoc. arguments for the command.
-	 * @return Event
+	 * @param class-string<\Mantle\Console\Command> $command Command class to run.
+	 * @param array                                 $arguments Arguments for the command.
+	 * @param array                                 $assoc_args Assoc. arguments for the command.
 	 *
 	 * @throws RuntimeException Thrown on missing command.
 	 * @throws RuntimeException Thrown invalid command class.
@@ -117,7 +112,7 @@ class Schedule {
 			throw new RuntimeException( "Command class not found: [{$command}]" );
 		}
 
-		if ( ! is_subclass_of( $command, Command::class ) ) {
+		if ( ! is_subclass_of( $command, Command::class ) ) { // @phpstan-ignore-line function.alreadyNarrowedType
 			throw new RuntimeException( "Invalid command class passed: [{$command}]" );
 		}
 
@@ -131,9 +126,8 @@ class Schedule {
 	/**
 	 * Add a new job event.
 	 *
-	 * @param string $job Job class to run.
-	 * @param array  $arguments Arguments for the command.
-	 * @return Event
+	 * @param class-string $job Job class to run.
+	 * @param array        $arguments Arguments for the command.
 	 *
 	 * @throws RuntimeException Thrown on missing command.
 	 * @throws RuntimeException Thrown invalid command class..
@@ -157,11 +151,10 @@ class Schedule {
 	/**
 	 * Add a callback event.
 	 *
-	 * @param string $callback Callback to run.
-	 * @param array  $arguments Arguments for the callback.
-	 * @return Event
+	 * @param callable $callback Callback to run.
+	 * @param array    $arguments Arguments for the callback.
 	 */
-	public function call( $callback, array $arguments = [] ): Event {
+	public function call( callable $callback, array $arguments = [] ): Event {
 		$event = new Event( $callback, $arguments, $this->get_timezone() );
 
 		$this->events[] = $event;
@@ -186,7 +179,7 @@ class Schedule {
 	 *
 	 * @return Event[]
 	 */
-	public function events() {
+	public function events(): array {
 		return $this->events;
 	}
 }
