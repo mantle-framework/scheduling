@@ -7,6 +7,7 @@
 
 namespace Mantle\Scheduling;
 
+use DateTimeZone;
 use Mantle\Contracts\Application;
 use Mantle\Framework\Exceptions\Handler;
 use Throwable;
@@ -36,14 +37,10 @@ class Job_Event extends Event {
 
 		$this->call_before_callbacks( $container );
 
+		$instance = $container->make( $this->callback );
 
 		try {
-			if ( is_callable( $this->callback ) ) {
-				call_user_func( $this->callback, $this->parameters );
-			} else {
-				$instance = $container->make( $this->callback );
-				$instance->handle( $this->parameters );
-			}
+			$instance->handle( $this->parameters );
 
 			$this->exit_code = 0;
 		} catch ( Throwable $e ) {
